@@ -3,37 +3,28 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\User;
+use App\Models\Societie;
 use App\Models\Regional;
 use App\Models\Consultation;
 use App\Models\Spot;
-use App\Models\VaccineAvaillable;
-use App\Models\RegVaccination;
-
-use Validator;
-
+use App\Models\SpotVaccine;
+use App\Models\Vaccine;
+use App\Models\Vaccination;
 class ConsulController extends Controller
 {
     public function addconsul(Request $request){
         $token = $request->token;
-        $user = User::where('remember_token', $token)->first();
-        if($user === null){
+        $user = Societie::where('login_tokens', $token)->first();
+        if($user === null || $token === null){
             return response()
                 ->json(['message' => 'Unauthorized user'], 401);
         }else{
-            $validator = Validator::make($request->all(),[
-                'desease_history' => 'required',
-                'current_symptoms' => 'required'
-            ]);
-    
-            if($validator->fails()){
-                return response()->json($validator->errors());       
-            }
+           
             $user_id = $user->id;
             if($consultation = Consultation::create([
-                'user_id' => $user_id,
+                'society_id' => $user_id,
                 'status' => 'pending',
-                'desease_history' => $request->desease_history,
+                'disease_history' => $request->desease_history,
                 'current_symptoms' => $request->current_symptoms,
                 'doctor_notes' => 'OK',
                 'doctor_id' => '1'
@@ -49,23 +40,23 @@ class ConsulController extends Controller
 
     public function getconsul(Request $request){
         $token = $request->token;
-        $user = User::where('remember_token', $token)->first();
+        $user = Societie::where('login_tokens', $token)->first();
         if($user === null || $token === null){
             return response()
                 ->json(['message' => 'Unauthorized user'], 401);
         }else{
             
             $user_id = $user->id;
-            if($consultation = Consultation::where('user_id' , $user_id)){
-                $result = $consultation->join('doctors', 'consultations.doctor_id', '=', 'doctors.id')->get();
+            if($consultation = Consultation::where('society_id' , $user_id)){
+                $result = $consultation->join('medicals', 'consultations.doctor_id', '=', 'medicals.id')->get();
                 foreach($result as $result){
                     return response()
                     ->json(['id' => $result->id,
                             'status'=>$result->status,
-                            'disease_history'=>$result->desease_history,
+                            'disease_history'=>$result->disease_history,
                             'current_symptoms'=>$result->current_symptoms,
                             'doctor_notes' => $result->doctor_notes,
-                            'doctor'=>['DOCTOR'=>$result->doctor_name]
+                            'doctor'=>['DOCTOR'=>$result->name]
                          ],200);
                     }
                 }else{
@@ -77,25 +68,25 @@ class ConsulController extends Controller
 
     public function getspot(Request $request){
         $token = $request->token;
-        $user = User::where('remember_token', $token)->first();
+        $user = Societie::where('login_tokens', $token)->first();
         if($user == null || $token === null){
             return response()
                 ->json(['message' => 'Unauthorized user'], 401);
         }else{
             $spots = Spot::where('regional_id' , $user->regional_id)
-                            ->select('id','spot_name as name','address','serve','capacity')
+                            ->select('id','name','address','serve','capacity')
                             ->get()->toArray();
                 for($x = 0; $x < count($spots); $x++){
-                    $vaccine = VaccineAvaillable::where('spot_id',$spots[$x]['id'])
-                                                ->join('Vaccines','Vaccine_availlables.vaccine_id','=','Vaccines.id')
-                                                ->select('Vaccines.vaccine_name','Vaccine_availlables.status')
+                    $vaccine = SpotVaccine::where('spot_id',$spots[$x]['id'])
+                                                ->join('Vaccines','Spot_Vaccines.vaccine_id','=','Vaccines.id')
+                                                ->select('Vaccines.name')
                                                 ->get();
                 $data=[];
                 for($y=0;$y < count($vaccine); $y++){
-                    if($vaccine[$y]['status'] === 1){
+                    if(count($vaccine) >= 0){
                         $status = true;
                     }else{ $status = false;}
-                    $data[$y]=array($vaccine[$y]['vaccine_name'] => $status);
+                    $data[$y]=array($vaccine[$y]['name'] => $status);
                 }
                
                        $cek = ['available_vaccines'=>$data];
@@ -110,7 +101,7 @@ class ConsulController extends Controller
 
     public function getspotdetail(Request $request,$id){
         $token = $request->token;
-        $user = User::where('remember_token', $token)->first();
+        $user = Societie::where('login_tokens', $token)->first();
         if($user === null || $token === null || $id === null){
             return response()
                 ->json(['message' => 'Unauthorized user'], 401);
@@ -118,20 +109,20 @@ class ConsulController extends Controller
             if($request->date === null){
                 $date = date('Y-m-d');
             }else{$date = $request->date;}
-            $count = RegVaccination::where('spot_id' , $id)
-                            ->where('vaccin_date',$date)
-                            ->where('status','Waiting')
+            $count = Vaccination::where('spot_id' , $id)
+                            ->where('date',$date)
+                            ->where('vaccine_id',null)
                             ->count();
             $spots = Spot::where('id' , $id)
                             ->get();
                     return response()->json([
                             "date" => date('F d, Y', strtotime($date)),
-                            'Spot' => ['id'=>$spots[0]['id'],'name'=>$spots[0]['spot_name'],'address'=>$spots[0]['address'],'serve'=>$spots[0]['serve'],'capacity'=>$spots[0]['capacity']],
+                            'Spot' => ['id'=>$spots[0]['id'],'name'=>$spots[0]['name'],'address'=>$spots[0]['address'],'serve'=>$spots[0]['serve'],'capacity'=>$spots[0]['capacity']],
                             'vaccinations_count' => $count
                             ],200);
                         
                 
         }
     }
-
+    
 }
