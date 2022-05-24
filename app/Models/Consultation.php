@@ -9,9 +9,9 @@ class Consultation extends Model
 {
     use HasFactory;
     protected $fillable = [
-        'user_id',
+        'society_id',
         'status',
-        'desease_history',
+        'disease_history',
         'current_symptoms',
         'doctor_notes',
         'doctor_id'
